@@ -5,43 +5,66 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>floxmap — Flow Viewer</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
-header { padding: 12px 20px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
-header h1 { font-size: 16px; font-weight: 600; }
-header .meta { font-size: 12px; color: #8b949e; margin-left: auto; }
-.container { flex: 1; position: relative; overflow: hidden; }
-svg { width: 100%; height: 100%; }
-.node { cursor: pointer; transition: opacity 0.2s; }
-.node circle { stroke-width: 2; transition: fill 0.2s, stroke 0.2s; }
-.node text { font-size: 12px; fill: #c9d1d9; pointer-events: none; }
-.edge { stroke: #30363d; stroke-width: 1.5; fill: none; marker-end: url(#arrow); transition: stroke 0.2s, opacity 0.2s; }
-.dimmed { opacity: 0.15; }
-.highlight circle { stroke-width: 3; }
-.sidebar { position: absolute; top: 0; right: 0; width: 300px; height: 100%; background: #161b22; border-left: 1px solid #30363d; padding: 16px; overflow-y: auto; transform: translateX(100%); transition: transform 0.2s; }
-.sidebar.open { transform: translateX(0); }
-.sidebar h2 { font-size: 14px; margin-bottom: 8px; }
-.sidebar p { font-size: 13px; color: #8b949e; margin-bottom: 12px; }
-.sidebar .deps { font-size: 12px; }
-.sidebar .deps span { display: inline-block; background: #21262d; padding: 2px 8px; border-radius: 4px; margin: 2px 4px 2px 0; }
-.sidebar .close { position: absolute; top: 12px; right: 12px; cursor: pointer; color: #8b949e; font-size: 18px; }
-.legend { position: absolute; bottom: 16px; left: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px 14px; font-size: 11px; }
-.legend div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;height:100vh;overflow:hidden}
+header{padding:10px 16px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:12px;z-index:10;position:relative}
+header h1{font-size:15px;font-weight:600;white-space:nowrap}
+header .meta{font-size:11px;color:#8b949e;white-space:nowrap}
+.search-box{position:relative}
+.search-box input{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:5px 10px 5px 28px;color:#c9d1d9;font-size:12px;width:200px;outline:none}
+.search-box input:focus{border-color:#58a6ff}
+.search-box svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;fill:#8b949e;pointer-events:none}
+.search-count{font-size:11px;color:#8b949e;margin-left:8px}
+#graph-container{position:absolute;top:48px;left:0;right:0;bottom:0}
+#graph-container svg{width:100%;height:100%}
+.sidebar{position:absolute;top:0;right:0;width:320px;height:100%;background:#161b22;border-left:1px solid #30363d;padding:16px;overflow-y:auto;transform:translateX(100%);transition:transform 0.2s;z-index:20}
+.sidebar.open{transform:translateX(0)}
+.sidebar h2{font-size:14px;margin-bottom:6px}
+.sidebar .source-badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-bottom:10px}
+.sidebar p{font-size:13px;color:#8b949e;margin-bottom:12px;line-height:1.4}
+.sidebar .section-title{font-size:11px;text-transform:uppercase;color:#8b949e;margin:12px 0 6px;letter-spacing:0.5px}
+.sidebar .dep-list{display:flex;flex-wrap:wrap;gap:4px}
+.sidebar .dep-tag{background:#21262d;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+.sidebar .dep-tag:hover{background:#30363d}
+.sidebar .close{position:absolute;top:12px;right:12px;cursor:pointer;color:#8b949e;font-size:20px;line-height:1}
+.sidebar .close:hover{color:#c9d1d9}
+.controls{position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;gap:4px;z-index:10}
+.controls button{width:32px;height:32px;border:1px solid #30363d;background:#161b22;color:#c9d1d9;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.controls button:hover{background:#21262d;border-color:#484f58}
+.legend{position:absolute;bottom:16px;left:16px;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 14px;font-size:11px;z-index:10}
+.legend div{display:flex;align-items:center;gap:8px;margin:3px 0}
+.legend .dot{width:8px;height:8px;border-radius:50%}
 </style>
 </head>
 <body>
 <header>
   <h1>floxmap</h1>
   <span class="meta" id="meta"></span>
+  <div class="search-box">
+    <svg viewBox="0 0 20 20"><path d="M8 3a5 5 0 100 10A5 5 0 008 3zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/></svg>
+    <input type="text" id="search" placeholder="Search nodes..." autocomplete="off">
+    <span class="search-count" id="search-count"></span>
+  </div>
 </header>
-<div class="container">
-  <svg id="graph"></svg>
+<div id="graph-container">
   <div class="sidebar" id="sidebar">
     <span class="close" onclick="closeSidebar()">&times;</span>
     <h2 id="sb-name"></h2>
+    <div id="sb-badge"></div>
     <p id="sb-desc"></p>
-    <div class="deps" id="sb-deps"></div>
+    <div class="section-title">Trigger</div>
+    <div id="sb-trigger" style="font-family:monospace;font-size:12px;background:#21262d;padding:6px 10px;border-radius:4px;margin-bottom:10px;word-break:break-all"></div>
+    <div class="section-title">Steps</div>
+    <ol id="sb-steps" style="font-size:12px;color:#c9d1d9;padding-left:18px;margin-bottom:12px"></ol>
+    <div class="section-title">Connects to</div>
+    <div class="dep-list" id="sb-out"></div>
+    <div class="section-title">Referenced by</div>
+    <div class="dep-list" id="sb-in"></div>
+  </div>
+  <div class="controls">
+    <button onclick="zoomIn()" title="Zoom in">+</button>
+    <button onclick="zoomOut()" title="Zoom out">&minus;</button>
+    <button onclick="zoomReset()" title="Reset view">&#8634;</button>
   </div>
   <div class="legend">
     <div><span class="dot" style="background:#58a6ff"></span> code</div>
@@ -50,111 +73,210 @@ svg { width: 100%; height: 100%; }
     <div><span class="dot" style="background:#8b949e"></span> derived</div>
   </div>
 </div>
+<script src="d3.min.js"></script>
 <script>
-const COLORS = { code: '#58a6ff', md: '#3fb950', brief: '#d29922', derived: '#8b949e' };
-let data = null;
-let selected = null;
+const COLORS={code:'#58a6ff',md:'#3fb950',brief:'#d29922',derived:'#8b949e'};
+let data=null,simulation=null,svgG=null,zoomBehavior=null,currentTransform=d3.zoomIdentity;
 
-async function load() {
-  try {
-    const resp = await fetch('flow-map.json');
-    data = await resp.json();
-  } catch {
-    const el = document.getElementById('meta');
-    el.textContent = 'Could not load flow-map.json';
-    return;
+function nodeR(n){
+  if(n<20)return 14;if(n<50)return 10;if(n<150)return 7;if(n<400)return 5;return 4;
+}
+
+function load(){
+  fetch('flow-map.json').then(r=>{
+    if(!r.ok)throw new Error(r.status+' '+r.statusText);
+    return r.json();
+  }).then(d=>{
+    data=d;
+    document.getElementById('meta').textContent=
+      d.project+' \u2014 '+d.nodes.length+' nodes, '+d.edges.length+' edges';
+    render();
+  }).catch(e=>{
+    document.getElementById('meta').textContent='Error: '+e.message;
+    console.error(e);
+  });
+}
+
+function render(){
+  const container=document.getElementById('graph-container');
+  const W=container.clientWidth||960;
+  const H=container.clientHeight||600;
+  const R=nodeR(data.nodes.length);
+
+  // Prepare data (D3 mutates, so copy)
+  const nodes=data.nodes.map(d=>({...d}));
+  const links=data.edges.map(d=>({source:d.from,target:d.to,from:d.from,to:d.to}));
+  const nodeMap={};nodes.forEach(n=>nodeMap[n.id]=n);
+
+  // Force simulation
+  simulation=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(80).strength(0.3))
+    .force('charge',d3.forceManyBody().strength(-200).distanceMax(600))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide(R+2));
+
+  // Create SVG
+  const svg=d3.select(container).append('svg')
+    .attr('width',W)
+    .attr('height',H)
+    .attr('viewBox',[0,0,W,H]);
+
+  // Zoom
+  const LABEL_THRESHOLD=1.2;
+  zoomBehavior=d3.zoom()
+    .scaleExtent([0.05,10])
+    .on('zoom',e=>{
+      currentTransform=e.transform;
+      svgG.attr('transform',e.transform);
+      // Show labels when zoomed in enough
+      d3.selectAll('text').attr('opacity',e.transform.k>=LABEL_THRESHOLD?1:0);
+    });
+  svg.call(zoomBehavior);
+
+  svgG=svg.append('g');
+
+  // Links
+  const link=svgG.append('g')
+    .attr('stroke','#484f58')
+    .attr('stroke-opacity',0.5)
+    .attr('stroke-width',1)
+    .selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('data-from',d=>d.from)
+    .attr('data-to',d=>d.to);
+
+  // Nodes (flat circles, like Observable)
+  const node=svgG.append('g')
+    .attr('stroke','#fff')
+    .attr('stroke-width',1.5)
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('r',R)
+    .attr('fill',d=>COLORS[d.source]||COLORS.derived)
+    .attr('data-id',d=>d.id)
+    .style('cursor','pointer')
+    .on('click',(e,d)=>clickNode(d.id))
+    .call(d3.drag()
+      .on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;})
+      .on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;}));
+
+  // Native tooltip
+  node.append('title').text(d=>d.name);
+
+  // Text labels (hidden by default, shown when zoomed in)
+  const label=svgG.append('g')
+    .selectAll('text')
+    .data(nodes)
+    .join('text')
+    .text(d=>d.name)
+    .attr('text-anchor','middle')
+    .attr('dy',R+12)
+    .attr('font-size',10)
+    .attr('fill','#c9d1d9')
+    .attr('pointer-events','none')
+    .attr('opacity',0);
+
+  // Tick
+  simulation.on('tick',()=>{
+    link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
+        .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+    node.attr('cx',d=>d.x).attr('cy',d=>d.y);
+    label.attr('x',d=>d.x).attr('y',d=>d.y);
+  });
+
+  // Zoom to fit after initial render
+  setTimeout(()=>zoomFit(svg,W,H),500);
+}
+
+function zoomFit(svg,W,H){
+  const bounds=svgG.node().getBBox();
+  if(!bounds.width||!bounds.height)return;
+  const pad=40;
+  const scale=Math.min(W/(bounds.width+pad*2),H/(bounds.height+pad*2));
+  const tx=W/2-scale*(bounds.x+bounds.width/2);
+  const ty=H/2-scale*(bounds.y+bounds.height/2);
+  svg.transition().duration(300).call(zoomBehavior.transform,d3.zoomIdentity.translate(tx,ty).scale(scale));
+}
+
+function zoomIn(){d3.select('#graph-container svg').transition().duration(200).call(zoomBehavior.scaleBy,1.5);}
+function zoomOut(){d3.select('#graph-container svg').transition().duration(200).call(zoomBehavior.scaleBy,0.67);}
+function zoomReset(){
+  const svg=d3.select('#graph-container svg');
+  const W=+svg.attr('width'),H=+svg.attr('height');
+  zoomFit(svg,W,H);
+}
+
+function clickNode(id){
+  const neighbors=new Set([id]);
+  data.edges.forEach(e=>{
+    if(e.from===id)neighbors.add(e.to);
+    if(e.to===id)neighbors.add(e.from);
+  });
+
+  d3.selectAll('circle').attr('opacity',d=>neighbors.has(d.id)?1:0.1);
+  d3.selectAll('line').attr('stroke-opacity',function(){return(this.getAttribute('data-from')===id||this.getAttribute('data-to')===id)?1:0.05;});
+
+  const node=data.nodes.find(n=>n.id===id);
+  if(!node)return;
+  document.getElementById('sb-name').textContent=node.name;
+  const color=COLORS[node.source]||COLORS.derived;
+  document.getElementById('sb-badge').innerHTML=
+    '<span class="source-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+node.source+'</span>';
+  document.getElementById('sb-desc').textContent=node.description||'';
+  document.getElementById('sb-trigger').textContent=node.trigger||'-';
+  const stepsEl=document.getElementById('sb-steps');
+  if(node.steps&&node.steps.length){
+    stepsEl.innerHTML=node.steps.map(function(s){return '<li>'+s+'</li>';}).join('');
+    stepsEl.style.display='';
+  }else{
+    stepsEl.innerHTML='';
+    stepsEl.style.display='none';
   }
-  document.getElementById('meta').textContent =
-    `${data.project} — ${data.nodes.length} nodes, ${data.edges.length} edges`;
-  render();
+
+  const outIds=data.edges.filter(e=>e.from===id).map(e=>e.to);
+  const inIds=data.edges.filter(e=>e.to===id).map(e=>e.from);
+  document.getElementById('sb-out').innerHTML=outIds.length
+    ?outIds.map(function(d){return '<span class="dep-tag" onclick="clickNode(\''+d+'\')">'+d+'</span>';}).join('')
+    :'<span style="color:#484f58;font-size:12px">none</span>';
+  document.getElementById('sb-in').innerHTML=inIds.length
+    ?inIds.map(function(d){return '<span class="dep-tag" onclick="clickNode(\''+d+'\')">'+d+'</span>';}).join('')
+    :'<span style="color:#484f58;font-size:12px">none</span>';
+  document.getElementById('sidebar').classList.add('open');
 }
 
-function render() {
-  const svg = document.getElementById('graph');
-  const W = svg.clientWidth || 900;
-  const H = svg.clientHeight || 600;
-
-  // Simple force-like layout: spread nodes in a circle
-  const nodes = data.nodes.map((n, i) => {
-    const angle = (2 * Math.PI * i) / data.nodes.length;
-    return { ...n, x: W/2 + 200 * Math.cos(angle), y: H/2 + 200 * Math.sin(angle) };
-  });
-
-  const nodeMap = {};
-  nodes.forEach(n => nodeMap[n.id] = n);
-
-  let html = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#30363d"/></marker></defs>`;
-
-  // Edges
-  data.edges.forEach(e => {
-    const from = nodeMap[e.from];
-    const to = nodeMap[e.to];
-    if (!from || !to) return;
-    const dx = to.x - from.x, dy = to.y - from.y;
-    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    const sx = from.x + (dx/dist)*20, sy = from.y + (dy/dist)*20;
-    const ex = to.x - (dx/dist)*20, ey = to.y - (dy/dist)*20;
-    html += `<line class="edge" data-from="${e.from}" data-to="${e.to}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}"/>`;
-  });
-
-  // Nodes
-  nodes.forEach(n => {
-    const color = COLORS[n.source] || COLORS.derived;
-    html += `<g class="node" data-id="${n.id}" onclick="clickNode('${n.id}')">`;
-    html += `<circle cx="${n.x}" cy="${n.y}" r="16" fill="${color}33" stroke="${color}"/>`;
-    html += `<text x="${n.x}" y="${n.y + 30}" text-anchor="middle">${n.name}</text>`;
-    html += `</g>`;
-  });
-
-  svg.innerHTML = html;
-}
-
-function clickNode(id) {
-  if (selected === id) { clearHighlight(); return; }
-  selected = id;
-
-  const neighbors = new Set([id]);
-  data.edges.forEach(e => {
-    if (e.from === id) neighbors.add(e.to);
-    if (e.to === id) neighbors.add(e.from);
-  });
-
-  document.querySelectorAll('.node').forEach(el => {
-    el.classList.toggle('dimmed', !neighbors.has(el.dataset.id));
-    el.classList.toggle('highlight', el.dataset.id === id);
-  });
-  document.querySelectorAll('.edge').forEach(el => {
-    const connected = el.dataset.from === id || el.dataset.to === id;
-    el.classList.toggle('dimmed', !connected);
-    if (connected) el.style.stroke = '#58a6ff';
-  });
-
-  // Show sidebar
-  const node = data.nodes.find(n => n.id === id);
-  if (node) {
-    document.getElementById('sb-name').textContent = node.name;
-    document.getElementById('sb-desc').textContent = `Source: ${node.source}`;
-    const deps = data.edges.filter(e => e.from === id).map(e => e.to);
-    const depHtml = deps.length
-      ? '<strong>Connects to:</strong><br>' + deps.map(d => `<span>${d}</span>`).join('')
-      : '<em>No outgoing connections</em>';
-    document.getElementById('sb-deps').innerHTML = depHtml;
-    document.getElementById('sidebar').classList.add('open');
-  }
-}
-
-function clearHighlight() {
-  selected = null;
-  document.querySelectorAll('.dimmed').forEach(el => el.classList.remove('dimmed'));
-  document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
-  document.querySelectorAll('.edge').forEach(el => el.style.stroke = '');
+function clearHighlight(){
+  d3.selectAll('circle').attr('opacity',1);
+  d3.selectAll('line').attr('stroke-opacity',0.5);
   document.getElementById('sidebar').classList.remove('open');
 }
+function closeSidebar(){clearHighlight();}
 
-function closeSidebar() { clearHighlight(); }
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') clearHighlight(); });
-window.addEventListener('resize', () => { if (data) render(); });
+// Search
+const searchInput=document.getElementById('search');
+const searchCount=document.getElementById('search-count');
+searchInput.addEventListener('input',function(){
+  const q=searchInput.value.trim().toLowerCase();
+  if(!q){d3.selectAll('circle').attr('opacity',1);d3.selectAll('line').attr('stroke-opacity',0.5);searchCount.textContent='';return;}
+  const matches=new Set();
+  data.nodes.forEach(function(n){if(n.id.toLowerCase().includes(q)||n.name.toLowerCase().includes(q))matches.add(n.id);});
+  d3.selectAll('circle').attr('opacity',function(d){return matches.has(d.id)?1:0.05;});
+  d3.selectAll('line').attr('stroke-opacity',0.05);
+  searchCount.textContent=matches.size+'/'+data.nodes.length;
+});
+searchInput.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){
+    var q=searchInput.value.trim().toLowerCase();if(!q)return;
+    var match=data.nodes.find(function(n){return n.id.toLowerCase().includes(q)||n.name.toLowerCase().includes(q);});
+    if(match)clickNode(match.id);
+  }
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){clearHighlight();searchInput.value='';searchInput.dispatchEvent(new Event('input'));}
+  if(e.key==='/'&&document.activeElement!==searchInput){e.preventDefault();searchInput.focus();}
+});
 load();
 </script>
 </body>

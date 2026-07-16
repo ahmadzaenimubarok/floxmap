@@ -17,6 +17,7 @@ class OpenAICompatProvider(LLMProvider):
         url = f"{self.base_url}/chat/completions"
         payload = {
             "model": self.model,
+            "stream": False,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -29,6 +30,7 @@ class OpenAICompatProvider(LLMProvider):
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": "floxmap/1.0",
             },
         )
         try:

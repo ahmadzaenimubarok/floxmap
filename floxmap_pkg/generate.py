@@ -13,6 +13,7 @@ FLOXMAP_HOME = Path.home() / ".floxmap"
 SCHEMA_PATH = FLOXMAP_HOME / "flow-schema.yaml"
 
 VIEWER_TEMPLATE = Path(__file__).parent / "flow-viewer.html"
+D3_BUNDLE = Path(__file__).parent / "d3.min.js"
 
 
 def _load_schema() -> dict:
@@ -54,6 +55,9 @@ def _build_graph(flows: list[dict]) -> dict:
         nodes.append({
             "id": fid,
             "name": flow.get("name", fid),
+            "description": flow.get("description", ""),
+            "trigger": flow.get("trigger", ""),
+            "steps": flow.get("steps", []),
             "source": flow.get("source", "code"),
         })
         node_ids.add(fid)
@@ -121,11 +125,16 @@ def generate_project(name: str) -> None:
         json.dump(flow_map, f, indent=2)
     print(f"\nWritten: {map_path}")
 
-    # Write flow-viewer.html
+    # Write flow-viewer.html + d3.min.js
+    import shutil
     viewer_path = out_dir / "flow-viewer.html"
     if VIEWER_TEMPLATE.exists():
-        import shutil
         shutil.copy2(VIEWER_TEMPLATE, viewer_path)
         print(f"Written: {viewer_path}")
     else:
         print("Warning: flow-viewer.html template not found, skipping")
+
+    d3_path = out_dir / "d3.min.js"
+    if D3_BUNDLE.exists():
+        shutil.copy2(D3_BUNDLE, d3_path)
+        print(f"Written: {d3_path}")
