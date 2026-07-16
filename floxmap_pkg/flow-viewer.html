@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>floxmap — Flow Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
+header { padding: 12px 20px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 16px; font-weight: 600; }
+header .meta { font-size: 12px; color: #8b949e; margin-left: auto; }
+.container { flex: 1; position: relative; overflow: hidden; }
+svg { width: 100%; height: 100%; }
+.node { cursor: pointer; transition: opacity 0.2s; }
+.node circle { stroke-width: 2; transition: fill 0.2s, stroke 0.2s; }
+.node text { font-size: 12px; fill: #c9d1d9; pointer-events: none; }
+.edge { stroke: #30363d; stroke-width: 1.5; fill: none; marker-end: url(#arrow); transition: stroke 0.2s, opacity 0.2s; }
+.dimmed { opacity: 0.15; }
+.highlight circle { stroke-width: 3; }
+.sidebar { position: absolute; top: 0; right: 0; width: 300px; height: 100%; background: #161b22; border-left: 1px solid #30363d; padding: 16px; overflow-y: auto; transform: translateX(100%); transition: transform 0.2s; }
+.sidebar.open { transform: translateX(0); }
+.sidebar h2 { font-size: 14px; margin-bottom: 8px; }
+.sidebar p { font-size: 13px; color: #8b949e; margin-bottom: 12px; }
+.sidebar .deps { font-size: 12px; }
+.sidebar .deps span { display: inline-block; background: #21262d; padding: 2px 8px; border-radius: 4px; margin: 2px 4px 2px 0; }
+.sidebar .close { position: absolute; top: 12px; right: 12px; cursor: pointer; color: #8b949e; font-size: 18px; }
+.legend { position: absolute; bottom: 16px; left: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px 14px; font-size: 11px; }
+.legend div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>floxmap</h1>
+  <span class="meta" id="meta"></span>
+</header>
+<div class="container">
+  <svg id="graph"></svg>
+  <div class="sidebar" id="sidebar">
+    <span class="close" onclick="closeSidebar()">&times;</span>
+    <h2 id="sb-name"></h2>
+    <p id="sb-desc"></p>
+    <div class="deps" id="sb-deps"></div>
+  </div>
+  <div class="legend">
+    <div><span class="dot" style="background:#58a6ff"></span> code</div>
+    <div><span class="dot" style="background:#3fb950"></span> md</div>
+    <div><span class="dot" style="background:#d29922"></span> brief</div>
+    <div><span class="dot" style="background:#8b949e"></span> derived</div>
+  </div>
+</div>
+<script>
+const COLORS = { code: '#58a6ff', md: '#3fb950', brief: '#d29922', derived: '#8b949e' };
+let data = null;
+let selected = null;
+
+async function load() {
+  try {
+    const resp = await fetch('flow-map.json');
+    data = await resp.json();
+  } catch {
+    const el = document.getElementById('meta');
+    el.textContent = 'Could not load flow-map.json';
+    return;
+  }
+  document.getElementById('meta').textContent =
+    `${data.project} — ${data.nodes.length} nodes, ${data.edges.length} edges`;
+  render();
+}
+
+function render() {
+  const svg = document.getElementById('graph');
+  const W = svg.clientWidth || 900;
+  const H = svg.clientHeight || 600;
+
+  // Simple force-like layout: spread nodes in a circle
+  const nodes = data.nodes.map((n, i) => {
+    const angle = (2 * Math.PI * i) / data.nodes.length;
+    return { ...n, x: W/2 + 200 * Math.cos(angle), y: H/2 + 200 * Math.sin(angle) };
+  });
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  let html = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#30363d"/></marker></defs>`;
+
+  // Edges
+  data.edges.forEach(e => {
+    const from = nodeMap[e.from];
+    const to = nodeMap[e.to];
+    if (!from || !to) return;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const sx = from.x + (dx/dist)*20, sy = from.y + (dy/dist)*20;
+    const ex = to.x - (dx/dist)*20, ey = to.y - (dy/dist)*20;
+    html += `<line class="edge" data-from="${e.from}" data-to="${e.to}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}"/>`;
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const color = COLORS[n.source] || COLORS.derived;
+    html += `<g class="node" data-id="${n.id}" onclick="clickNode('${n.id}')">`;
+    html += `<circle cx="${n.x}" cy="${n.y}" r="16" fill="${color}33" stroke="${color}"/>`;
+    html += `<text x="${n.x}" y="${n.y + 30}" text-anchor="middle">${n.name}</text>`;
+    html += `</g>`;
+  });
+
+  svg.innerHTML = html;
+}
+
+function clickNode(id) {
+  if (selected === id) { clearHighlight(); return; }
+  selected = id;
+
+  const neighbors = new Set([id]);
+  data.edges.forEach(e => {
+    if (e.from === id) neighbors.add(e.to);
+    if (e.to === id) neighbors.add(e.from);
+  });
+
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.toggle('dimmed', !neighbors.has(el.dataset.id));
+    el.classList.toggle('highlight', el.dataset.id === id);
+  });
+  document.querySelectorAll('.edge').forEach(el => {
+    const connected = el.dataset.from === id || el.dataset.to === id;
+    el.classList.toggle('dimmed', !connected);
+    if (connected) el.style.stroke = '#58a6ff';
+  });
+
+  // Show sidebar
+  const node = data.nodes.find(n => n.id === id);
+  if (node) {
+    document.getElementById('sb-name').textContent = node.name;
+    document.getElementById('sb-desc').textContent = `Source: ${node.source}`;
+    const deps = data.edges.filter(e => e.from === id).map(e => e.to);
+    const depHtml = deps.length
+      ? '<strong>Connects to:</strong><br>' + deps.map(d => `<span>${d}</span>`).join('')
+      : '<em>No outgoing connections</em>';
+    document.getElementById('sb-deps').innerHTML = depHtml;
+    document.getElementById('sidebar').classList.add('open');
+  }
+}
+
+function clearHighlight() {
+  selected = null;
+  document.querySelectorAll('.dimmed').forEach(el => el.classList.remove('dimmed'));
+  document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+  document.querySelectorAll('.edge').forEach(el => el.style.stroke = '');
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function closeSidebar() { clearHighlight(); }
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') clearHighlight(); });
+window.addEventListener('resize', () => { if (data) render(); });
+load();
+</script>
+</body>
+</html>

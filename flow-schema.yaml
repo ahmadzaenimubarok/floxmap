@@ -1,0 +1,30 @@
+fields:
+  id:
+    type: string
+    required: true
+    description: "unique slug, kebab-case (e.g. login)"
+  name:
+    type: string
+    required: true
+    description: "human-readable name"
+  description:
+    type: string
+    required: true
+    description: "1-2 sentence summary"
+  trigger:
+    type: string
+    required: true
+    description: "what triggers the flow (endpoint / event / cron)"
+  steps:
+    type: list
+    required: true
+    description: "ordered list of steps (strings)"
+  dependency:
+    type: list
+    required: false
+    description: "ids of other nodes this flow connects to (edges)"
+  source:
+    type: enum
+    values: [code, md, brief]
+    required: true
+    description: "grounding trace"
